@@ -6,7 +6,7 @@ const util = require('silence-js-util');
 util.registerValidators({
   objectID: ObjectID.isValid,
   objectId: ObjectID.isValid
-})
+});
 
 class BaseMongoModel extends BaseModel {
   constructor() {

@@ -44,9 +44,10 @@ function create(proto) {
     fields.unshift({
       name: '_id',
       type: 'string',
-      rules: {
-        length: 24
-      }
+      rules: [{
+        type: 'length',
+        argv: 24
+      }, 'objectId']
     });
   }
   let funcStr = `
