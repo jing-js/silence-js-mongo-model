@@ -1,0 +1,24 @@
+{
+  "name": "silence-js-mongo-model",
+  "version": "1.0.0",
+  "description": "mongo model for silence-js",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Yuhang GE <abeyuhang@gmail.com>",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jing-js/silence-js-mongo-model.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jing-js/silence-js-mongo-model/issues"
+  },
+  "homepage": "https://github.com/jing-js/silence-js-mongo-model#readme",
+  "dependencies": {
+    "mongodb": "^2.2.10",
+    "silence-js-base-model": "^1.0.0",
+    "silence-js-util": "^1.0.0"
+  }
+}
