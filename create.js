@@ -1,5 +1,6 @@
 const BaseMongoModel = require('./BaseMongoModel');
-const { ModelField } = require('silence-js-base-model');
+const { ModelField, createFieldsConstructorCode } = require('silence-js-base-model');
+const util = require('silence-js-util');
 
 function create(proto) {
   let name = proto.name;
@@ -12,76 +13,77 @@ function create(proto) {
   }
   let fields = new Array(proto.fields.length);
   let foundId = false;
+  let shardField = null;
 
   for(let i = 0; i < proto.fields.length; i++) {
     let field = new ModelField(proto.fields[i]);
     if (!field.name) {
-      throw new Error(`Field must have 'name', please check fields of ${this.name}`);
+      throw new Error(`Field must have 'name', please check fields of ${field.name}`);
     } else if(['constructor'].indexOf(field.name) >= 0) {
       throw new Error(`Field name can not be ${field.name}, it's reserved words`);
     } else if (!field.type) {
-      throw new Error(`Field ${field.name} must have 'type', please check fields of ${this.name}`);
+      throw new Error(`Field ${field.name} must have 'type', please check fields of ${field.name}`);
     } else {
       let result = BaseMongoModel.__db.initField(field);
       if (result === -1) {
-        throw new Error(`Unknown field type ${field.dbType || field.type}, please check fields of ${this.name}`);
+        throw new Error(`Unknown field type ${field.dbType || field.type}, please check fields of ${field.name}`);
       } else if (result === -2) {
-        throw new Error(`Unsupported defaultValue of field ${field.name}, please check fields of ${this.name}`);
-      } else if (result === -3) {
-        throw new Error(`autoUpdate can only been applied to TIMESTAMP field with defaultValue 'now'`);
+        throw new Error(`Unsupported defaultValue of field ${field.name}, please check fields of ${field.name}`);
       }
     }
     if (field.name === 'id') {
       field.name = '_id';
     }
     if (field.name === '_id') {
+      field.type = 'string';
+      field.rules = [{
+        type: 'length',
+        argv: 24
+      }, 'objectId'];
       foundId = true;
     }
+    if (field.isShard && !shardField) {
+      if (shardField) {
+        throw new Error(`Collection ${name} can have only one shard field.`);
+      }
+      shardField = field;
+    }
+
     fields[i] = field;
   }
 
   if (!foundId) {
-    fields.unshift({
+    fields.unshift(new ModelField({
       name: '_id',
       type: 'string',
       rules: [{
         type: 'length',
         argv: 24
       }, 'objectId']
-    });
+    }));
   }
   let funcStr = `
-class ${name} extends BaseSQLModel {
-  constructor(values, assignDefaultValue = true) {
+class ${name} extends BaseMongoModel {
+  constructor(values, direct = false) {
   super();
-  const fields = this.constructor.fields;
-  ${fields.map((field, idx) => {
-    return`
-  this.${field.name} = values && values.hasOwnProperty('${field.name}') 
-      ? values.${field.name} : (assignDefaultValue ? fields[${idx}].defaultValue : undefined);
-`;    
-  }).join('\n')}
+${createFieldsConstructorCode(fields)}
   }
 }
 
 ${name}.table = '${table}';
 ${name}.fields = fields;
-${name}.fieldsTypeMap = new Map();
 
 return ${name};
 
 `;
 
-  let Class = (new Function('BaseMongoModel', 'fields', funcStr))(
-    BaseSQLModel,
-    fields
+  let Class = (new Function('BaseMongoModel', 'fields', 'CONVERTERS', funcStr))(
+    BaseMongoModel,
+    fields,
+    util.converters
   );
-
-  fields.forEach(field => {
-    Class.fieldsTypeMap.set(field.name, field.type);
-  });
 
   return Class;
 }
 
-module.exports = 
+module.exports = create;

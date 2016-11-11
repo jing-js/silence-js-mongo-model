@@ -8,6 +8,11 @@ util.registerValidators({
   objectId: ObjectID.isValid
 });
 
+util.registerConverters({
+  objectId: ObjectID,
+  objectID: ObjectID
+});
+
 class BaseMongoModel extends BaseModel {
   constructor() {
     super();
@@ -19,10 +24,33 @@ class BaseMongoModel extends BaseModel {
     return BaseMongoModel.__logger;
   }
   static dropTable() {
-    return this.collection.drop();
+    this.logger.debug('Drop collection ', this.table);
+    return new Promise((resolve, reject) => {
+      this.collection.drop().then(resolve, err => {
+        if (err.message === 'ns not found') {
+          resolve();
+        } else {
+          reject(err);
+        }
+      });
+    });
   }
-  static createTable() {
-    return this.db.createCollection(this.table);
+  static createTable(adminDB) {
+    this.logger.debug('Create collection ', this.table);
+    return this.db.createCollection(this.table).then(() => {
+      return Promise.all(this.fields.map(field => {
+        if (field.index) {
+          this.logger.debug('Create', field.isUnique ? 'UNIQUE' : '', 'index', field.name);
+          return this.collection.createIndex({
+            [field.name]: typeof field.index === 'number' ? field.index : 1
+          }, field.isUnique ? {
+            unique: true
+          }: undefined);
+        } else {
+          return Promise.resolve();
+        }
+      }));
+    });
   }
   static get collection() {
     return this.db.collection(this.table);
@@ -57,7 +85,7 @@ class BaseMongoModel extends BaseModel {
 
     return $q.toArray().then(docs => {
       return docs.map(doc => {
-        return doc ? new this(doc, false) : null;
+        return doc ? new this(doc, true) : null;
       });
     });
 
@@ -66,7 +94,7 @@ class BaseMongoModel extends BaseModel {
 
     function wrap(r) {
       return r.then(doc => {
-        return doc ? new this(doc, false) : null;
+        return doc ? new this(doc, true) : null;
       });
     }
 
@@ -77,7 +105,7 @@ class BaseMongoModel extends BaseModel {
       return wrap(this.collection.findOneAndUpdate(query, options.update, {
         sort: options.sort,
         projection: options.fields,
-        upsert: !!options.upsert
+        upsert: !!options.upsert,
         returnNewDocument: !!options.returnNewDocument
       }));
     } else if (options.remove) {
@@ -130,7 +158,9 @@ class BaseMongoModel extends BaseModel {
     return new Promise((resolve, reject) => {
       this.constructor.collection.insertOne(doc).then(r => {
         if (r.insertedCount === 1) {
-          r.insertedId && this._id = r.insertedId;
+          if (r.insertedId) {
+            this._id = r.insertedId;
+          }
           resolve(true);
         } else {
           resolve(false);

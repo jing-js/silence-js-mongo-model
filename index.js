@@ -4,7 +4,7 @@ const BaseMongoModel = require('./BaseMongoModel');
 const { BaseModel } = require('silence-js-base-model');
 
 const MongoModel = {
-  BaseSQLModel,
+  BaseMongoModel,
   __init(db, logger) {
     if (BaseMongoModel.__db) {
       throw new Error('BaseMongoModel.__db already exists. __init can be called only once.');
