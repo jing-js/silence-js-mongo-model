@@ -4,13 +4,19 @@ const EMPTY = {};
 const util = require('silence-js-util');
 
 util.registerValidators({
-  objectID: ObjectID.isValid,
-  objectId: ObjectID.isValid
+  objectID: validateObjectId,
+  objectId: validateObjectId
 });
 
+function validateObjectId(val) {
+  return val instanceof ObjectID || (typeof val === 'string' && val.length === 24) || (val instanceof Buffer && val.length === 12);
+}
+function convertObjectId(val) {
+  return validateObjectId(val) ? ObjectID(val) : val;
+}
 util.registerConverters({
-  objectId: ObjectID,
-  objectID: ObjectID
+  objectId: convertObjectId,
+  objectID: convertObjectId
 });
 
 class BaseMongoModel extends BaseModel {
