@@ -1,23 +1,41 @@
 'use strict';
 
-const BaseMongoModel = require('./BaseMongoModel');
-const { BaseModel } = require('silence-js-base-model');
+const ObjectID = require('mongodb').ObjectID;
+const Long = require('mongodb').Long;
+const util = require('silence-js-util');
+const Base = require('silence-js-base-model');
+const { create, store } = require('./create');
 
-const MongoModel = {
-  BaseMongoModel,
+util.registerValidators({
+  objectID: validateObjectId,
+  objectId: validateObjectId
+});
+
+function validateObjectId(val) {
+  return (typeof val === 'string' && val.length === 24) || val instanceof ObjectID || (val instanceof Buffer && val.length === 12);
+}
+function convertObjectId(val) {
+  return validateObjectId(val) ? ObjectID(val) : undefined;
+}
+function convertTimestamp(val) {
+  return val instanceof Long ? val : (typeof val === 'number' ? Long.fromNumber(val) : undefined);
+}
+
+util.registerConverters({
+  objectId: convertObjectId,
+  objectID: convertObjectId,
+  timestamp: convertTimestamp
+});
+
+module.exports = {
   __init(db, logger) {
-    if (BaseMongoModel.__db) {
-      throw new Error('BaseMongoModel.__db already exists. __init can be called only once.');
+    if (store.db) {
+      throw new Error('BaseMongoModel.db already exists. __init can be called only once.');
     }
-    BaseMongoModel.__db = db;
-    BaseMongoModel.__logger = logger;
-    BaseModel.__logger = logger;
+    store.db = db;
+    store.logger = logger;
+    Base.__init(logger);
   },
-  create: require('./create'),
-  isMongoModel(ModelClass) {
-    return Object.getPrototypeOf(ModelClass) === BaseMongoModel;
-  }
+  __store: store,
+  create
 };
-
-
-module.exports = MongoModel;
