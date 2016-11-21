@@ -57,7 +57,11 @@ function create(proto) {
       field.convert = 'objectId';
       field.rules = [ 'objectId' ];
     }
-    if (['int', 'integer'].indexOf(field.type) >= 0) {
+    if (field.type === 'binary') {
+      field.type = 'any';
+    }
+    if (field.type === 'binary') {}
+    if (['int', 'integer', 'long'].indexOf(field.type) >= 0) {
       field.type = 'number';
     } else if (field.type === 'timestamp') {
       field.type = 'number';
@@ -112,6 +116,25 @@ db._onInit(function(_db) {
 });
 
 ${createDeclareCode(fields)}
+
+function extract(doc) {${fields.map(field => {
+  switch(field.dbType) {
+    case 'BINARY':
+      return `
+  if (typeof doc.${field.name} === 'object' && doc.${field.name} !== null && doc.${field.name}._bsontype === 'Binary') {
+    doc.${field.name} = doc.${field.name}.buffer;
+  }`;
+    case 'LONG':
+      return `
+  if (typeof doc.${field.name} === 'number') {
+    doc.${field.name} = CONVERTERS.long(doc.${field.name});
+  }`;
+    default:
+      return '';
+  }
+  }).filter(c => !!c).join('')}
+  return doc;
+}
 
 class ${name} {
   static get shardField() {
@@ -232,7 +255,7 @@ class ${name} {
   }
   static all(query, options) {
     return this._find(query, options).toArray().then(docs => docs.map(doc => {
-      return doc ? new this(doc, true) : null;
+      return doc ? new this(extract(doc), true) : null;
     }));
   }
   static exists(query) {
@@ -246,32 +269,38 @@ class ${name} {
     });
   }
   static one(query, options) {
-    return this._find(query, options).next().then(doc => doc ? new this(doc, true) : null);
+    return this._find(query, options).next().then(doc => doc ? new this(extract(doc), true) : null);
   }
   static oneUpdate(query, doc, options) {
     this._dealUpdateDoc(doc);
     return collection.findOneAndUpdate(query, doc, ${_wc ? `options ? Object.assign(options, writeConcern) : writeConcern` : 'options'}).then(result => {
-      return result && result.value ? new this(result.value, true) : null;
+      return result && result.value ? new this(extract(result.value), true) : null;
     });
   }
   static oneReplace(query, doc, options) {
     this._dealUpdateDoc(doc);
     return collection.findOneAndReplace(query, doc, ${_wc ? `options ? Object.assign(options, writeConcern) : writeConcern` : 'options'}).then(result => {
-      return result && result.value ? new this(result.value, true) : null;
+      return result && result.value ? new this(extract(result.value), true) : null;
     });
   }
   static oneDelete(query, options) {
     return collection.findOneAndDelete(query, ${_wc ? `options ? Object.assign(options, writeConcern) : writeConcern` : 'options'}).then(result => {
-      return result && result.value ? new this(result.value, true) : null;
+      return result && result.value ? new this(extract(result.value), true) : null;
     });
   }
   static touch(query) {
     return collection.find(query).limit(1).project({
       _id: 1
-    }).next().then(doc => doc ? new this(doc, true) : null);
+    }).next().then(doc => doc ? new this(extract(doc), true) : null);
   }
   static count() {
     return Promise.reject('not implement as shard concern, see: https://docs.mongodb.com/v3.2/reference/method/db.collection.count/');
+  }
+  static updateOne(query, doc, options) {
+    this._dealUpdateDoc(doc);
+    return collection.updateOne(query, doc, ${_wc ? `options ? Object.assign(options, writeConcern) : writeConcern` : 'options'}).then(result => {
+      return result && result.modifiedCount === 1;
+    });
   }
 ${createFieldsConstructorCode(fields)}
 ${createValidateFunctionCode(fields)}

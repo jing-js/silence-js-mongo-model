@@ -20,11 +20,15 @@ function convertObjectId(val) {
 function convertTimestamp(val) {
   return val instanceof Long ? val : (typeof val === 'number' ? Long.fromNumber(val) : undefined);
 }
+function convertLong(val) {
+  return val instanceof Long ? val : (typeof val === 'number' ? Long.fromNumber(val) : undefined);
+}
 
 util.registerConverters({
   objectId: convertObjectId,
   objectID: convertObjectId,
-  timestamp: convertTimestamp
+  timestamp: convertTimestamp,
+  long: convertLong
 });
 
 module.exports = {
@@ -37,5 +41,8 @@ module.exports = {
     Base.__init(logger);
   },
   __store: store,
+  Long,
+  objectId: ObjectID,
+  ObjectID: ObjectID,
   create
 };
