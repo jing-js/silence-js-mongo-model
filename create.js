@@ -276,11 +276,20 @@ class ${name} {
 ${createFieldsConstructorCode(fields)}
 ${createValidateFunctionCode(fields)}
   save(validate = false) {
+    if (this.${PREFIX}_id !== undefined) {
+      return this.update(validate);
+    }
     if (validate && !this.validate()) {
       return Promise.resolve(false);
     }
     return new Promise((resolve, reject) => {
-      collection.insertOne(this${_wc ? `, writeConcernOptions` : ''}).then(r => {
+      let doc = {${fields.map((field, idx) => {
+        let fn = field.name;
+        return fn === '_id' ? '' : `
+        ${fn}: this.${PREFIX}${fn}`;
+      }).filter(f => !!f).join(',')}
+      };
+      collection.insertOne(doc${_wc ? `, writeConcernOptions` : ''}).then(r => {
         if (r.insertedCount === 1) {
           if (r.insertedId) {
             this.${PREFIX}_id = r.insertedId;
