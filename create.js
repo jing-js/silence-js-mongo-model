@@ -1,3 +1,5 @@
+const Long = require('mongodb').Long;
+
 const {
   ModelField,
   createHelper
@@ -66,6 +68,11 @@ function create(proto) {
     } else if (field.type === 'timestamp') {
       field.type = 'number';
       field.convert = 'timestamp';
+      if (field._defaultValue === 'now') {
+        field._defaultValue = function() {
+          return Long.fromNumber(Date.now());
+        }
+      }
     } else if (['string', 'boolean', 'any'].indexOf(field.type) < 0) {
       throw new Error(`Unsupport field type ${field.type} of ${field.name}`);
     }
@@ -127,7 +134,7 @@ function extract(doc) {${fields.map(field => {
     case 'LONG':
       return `
   if (typeof doc.${field.name} === 'number') {
-    doc.${field.name} = CONVERTERS.long(doc.${field.name});
+    doc.${field.name} = fc.${prefix}${field.name}(doc.${field.name});
   }`;
     default:
       return '';
