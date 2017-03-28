@@ -203,39 +203,81 @@ class ${name} {
       }
     }
   }
+  static _dealQuery(query) {
+    if (typeof query !== 'object' || query === null) return;
+    if (typeof query.id !== 'undefined') {
+      query._id = query.id;
+      delete query.id;
+    }
+    for(let fieldName in query) {
+      let fv = query[fieldName];
+      if (fv === undefined || fv === null) {
+        continue;
+      } else if (typeof fv === 'object') {
+        for(let op in fv) {
+          let opV = fv[op];
+          let opV2 = this._dealFieldV(opV, fieldName);
+          if (opV2 !== opV && opV2 !== undefined) {
+            fv[op] = opV2;
+          }
+        }
+      } else {
+        let v2 = this._dealFieldV(fv, fieldName);
+        if (v2 !== fv && v2 !== undefined) {
+          query[fieldName] = v2;
+        }
+      }
+    }
+  }
+  static _dealOptions(options) {
+    if (typeof options !== 'object' || options === null) return;
+    if (Array.isArray(options.projection)) {
+      let _projection = {};
+      options.projection.forEach(fieldName => {
+        _projection[fieldName === 'id' ? '_id' : fieldName] = 1;
+      });
+      options.projection = _projection;
+    }
+  }
   static _dealInsertDoc(doc) {
     for(let fieldName in doc) {
       let v = doc[fieldName];
       if (v === undefined || v === null) {
         continue;
       }
-      let v2 = v;
-      switch (fieldName) {${fields.map((field, idx) => {
-      let v2 = '';
-      let code = `
-        case '${field.name}':`;
-      if (field.convert) {
-        if (typeof field.convert === 'function') {
-          v2 = `v2 = fc.${PREFIX}${field.name}(v);`
-        } else if (typeof field.convert === 'string' && util.converters.hasOwnProperty(field.convert)) {
-          v2 = `v2 = fc.${PREFIX}${field.name}(v);`
-        }
-      } else if (field.type !== 'any' && util.converters.hasOwnProperty(field.type)) {
-        v2 = `if (typeof v !== '${field.type}') v2 = fc.${PREFIX}${field.name}(v);`
+      let v2 = this._dealFieldV(v, fieldName);
+      if (v2 === undefined) {
+        delete doc[fieldName];
+      } else if (v2 !== v) {
+        doc[fieldName] = v2;
       }
-      code += `
-          ${v2}
-          break;`;
-      return code;
-    }).join('')}
-        default:
-          delete doc[fieldName];
-          break;
-      }
-      if (v2 !== v) doc[fieldName] = v2;
     }
   }
-
+  static _dealFieldV(v, fieldName) {
+    switch (fieldName) {${fields.map((field, idx) => {
+  let v2 = '';
+  let code = `
+      case '${field.name}':`;
+  if (field.convert) {
+    if (typeof field.convert === 'function') {
+      v2 = `return fc.${PREFIX}${field.name}(v);`
+    } else if (typeof field.convert === 'string' && util.converters.hasOwnProperty(field.convert)) {
+      v2 = `return fc.${PREFIX}${field.name}(v);`
+    }
+  } else if (field.type !== 'any' && util.converters.hasOwnProperty(field.type)) {
+    v2 = `if (typeof v !== '${field.type}') return fc.${PREFIX}${field.name}(v);`
+  }
+  code += `
+        ${v2}
+        break;`;
+  return code;
+}).join('')}
+      default:
+        return undefined;
+        break;
+    }
+    return v;
+  }
   /**
    *
    * @param query
@@ -243,7 +285,8 @@ class ${name} {
    * @returns {cursor}
    */
   static _find(query, options) {
-    let $q = this.collection.find(query || {});
+    
+    let $q = this.collection.find(query);
 
     if (options && options.skip) {
       $q = $q.skip(options.skip);
@@ -261,41 +304,52 @@ class ${name} {
     return $q;
   }
   static all(query, options) {
+    this._dealQuery(query);
+    this._dealOptions(options);
     return this._find(query, options).toArray().then(docs => docs.map(doc => {
       return doc ? new this(extract(doc), true) : null;
     }));
   }
   static exists(query) {
+    this._dealQuery(query);
     if (!query) {
-      return Promise.resolve(false);
+      return Promise.reject('exists need query');
     }
-    return collection.find(query).limit(1).project({
+    return collection.find(query).project({
       _id: 1
-    }).next().then(doc => {
+    }).limit(1).next().then(doc => {
       return !!doc;
     });
   }
   static one(query, options) {
+    this._dealQuery(query);
+    this._dealOptions(options);
     return this._find(query, options).next().then(doc => doc ? new this(extract(doc), true) : null);
   }
   static oneUpdate(query, doc, options) {
     this._dealUpdateDoc(doc);
+    this._dealQuery(query);
+    this._dealOptions(options);
     return collection.findOneAndUpdate(query, doc, ${_wc ? `options ? Object.assign(options, writeConcern) : writeConcern` : 'options'}).then(result => {
       return result && result.value ? new this(extract(result.value), true) : null;
     });
   }
   static oneReplace(query, doc, options) {
     this._dealUpdateDoc(doc);
+    this._dealQuery(query);
+    this._dealOptions(options);
     return collection.findOneAndReplace(query, doc, ${_wc ? `options ? Object.assign(options, writeConcern) : writeConcern` : 'options'}).then(result => {
       return result && result.value ? new this(extract(result.value), true) : null;
     });
   }
   static oneDelete(query, options) {
+    this._dealQuery(query);
     return collection.findOneAndDelete(query, ${_wc ? `options ? Object.assign(options, writeConcern) : writeConcern` : 'options'}).then(result => {
       return result && result.value ? new this(extract(result.value), true) : null;
     });
   }
   static touch(query) {
+    this._dealQuery(query);
     return collection.find(query).limit(1).project({
       _id: 1
     }).next().then(doc => doc ? new this(extract(doc), true) : null);
@@ -305,6 +359,7 @@ class ${name} {
   }
   static updateOne(query, doc, options) {
     this._dealUpdateDoc(doc);
+    this._dealQuery(query);
     return collection.updateOne(query, doc, ${_wc ? `options ? Object.assign(options, writeConcern) : writeConcern` : 'options'}).then(result => {
       return result && result.modifiedCount === 1;
     });
@@ -332,11 +387,13 @@ ${createValidateFunctionCode(fields)}
           }
           resolve(true);
         } else {
+          logger.error('insertCount not match!');
+          logger.error(r);
           resolve(false);
         }
       }, err => {
-        logger.error(err);
-        resolve(false);
+        err.code !== 11000 && logger.error(err);
+        resolve(err.code === 11000 ? 'duplicate_key' : false);
       });
     });
   }
@@ -366,8 +423,8 @@ ${createValidateFunctionCode(fields)}
           resolve(false);
         }
       }, err => {
-        logger.error(err);
-        resolve(false);
+        err.code !== 11000 && logger.error(err);
+        resolve(err.code === 11000 ? 'duplicate_key' : false);
       });
     });
   }
@@ -396,7 +453,7 @@ ${createFieldsPropertiesCode(fields)}
     return this.${PREFIX}_id;
   }
   set id(val) {
-    this._id = val;
+    this.${PREFIX}_id = val;
   }
 }
 
