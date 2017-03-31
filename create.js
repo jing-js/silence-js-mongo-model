@@ -229,16 +229,6 @@ class ${name} {
       }
     }
   }
-  static _dealOptions(options) {
-    if (typeof options !== 'object' || options === null) return;
-    if (Array.isArray(options.projection)) {
-      let _projection = {};
-      options.projection.forEach(fieldName => {
-        _projection[fieldName === 'id' ? '_id' : fieldName] = 1;
-      });
-      options.projection = _projection;
-    }
-  }
   static _dealInsertDoc(doc) {
     for(let fieldName in doc) {
       let v = doc[fieldName];
@@ -305,10 +295,16 @@ class ${name} {
   }
   static all(query, options) {
     this._dealQuery(query);
-    this._dealOptions(options);
-    return this._find(query, options).toArray().then(docs => docs.map(doc => {
-      return doc ? new this(extract(doc), true) : null;
-    }));
+    return this._find(query, options).toArray().then(docs => {
+      for(let i = 0; i < docs.length; i++) {
+        extract(docs[i]);
+      }
+      if (options && options.__json) {
+        return docs;
+      } else {
+        return docs.map(doc => doc ? new this(doc, true) : null)
+      }
+    });
   }
   static exists(query) {
     this._dealQuery(query);
@@ -323,36 +319,45 @@ class ${name} {
   }
   static one(query, options) {
     this._dealQuery(query);
-    this._dealOptions(options);
-    return this._find(query, options).next().then(doc => doc ? new this(extract(doc), true) : null);
+    return this._find(query, options).next().then(doc => {
+      if (!doc) return null;
+      extract(doc);
+      return options && options.__json ? doc : new this(doc, true);
+    });
   }
   static oneUpdate(query, doc, options) {
     this._dealUpdateDoc(doc);
     this._dealQuery(query);
-    this._dealOptions(options);
     return collection.findOneAndUpdate(query, doc, ${_wc ? `options ? Object.assign(options, writeConcern) : writeConcern` : 'options'}).then(result => {
-      return result && result.value ? new this(extract(result.value), true) : null;
+      if (!result || !result.value) return null;
+      extract(result.value);
+      return options && options.__json ? result.value : new this(result.value, true);
     });
   }
   static oneReplace(query, doc, options) {
     this._dealUpdateDoc(doc);
     this._dealQuery(query);
-    this._dealOptions(options);
     return collection.findOneAndReplace(query, doc, ${_wc ? `options ? Object.assign(options, writeConcern) : writeConcern` : 'options'}).then(result => {
-      return result && result.value ? new this(extract(result.value), true) : null;
-    });
+      if (!result || !result.value) return null;
+      extract(result.value);
+      return options && options.__json ? result.value : new this(result.value, true);    });
   }
   static oneDelete(query, options) {
     this._dealQuery(query);
     return collection.findOneAndDelete(query, ${_wc ? `options ? Object.assign(options, writeConcern) : writeConcern` : 'options'}).then(result => {
-      return result && result.value ? new this(extract(result.value), true) : null;
-    });
+      if (!result || !result.value) return null;
+      extract(result.value);
+      return options && options.__json ? result.value : new this(result.value, true);    });
   }
-  static touch(query) {
+  static touch(query, options) {
     this._dealQuery(query);
     return collection.find(query).limit(1).project({
       _id: 1
-    }).next().then(doc => doc ? new this(extract(doc), true) : null);
+    }).next().then(doc => {
+      if (!doc) return null;
+      extract(doc);
+      return options && options.__json ? doc : new this(doc, true);
+    });
   }
   static count() {
     return Promise.reject('not implement as shard concern, see: https://docs.mongodb.com/v3.2/reference/method/db.collection.count/');
@@ -449,11 +454,13 @@ ${createValidateFunctionCode(fields)}
     });
   }
 ${createFieldsPropertiesCode(fields)}
-  get id() {
-    return this.${PREFIX}_id;
-  }
-  set id(val) {
-    this.${PREFIX}_id = val;
+  toJSON() {
+    return {
+${fields.map((field, idx) => {
+    let fn = field.name;
+    return `${fn === '_id' ? 'id' : fn}: this.${PREFIX}${fn}`;
+}).join(',\n')}
+    };
   }
 }
 
