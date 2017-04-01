@@ -1,7 +1,8 @@
 'use strict';
 
-const ObjectID = require('mongodb').ObjectID;
-const Long = require('mongodb').Long;
+const mongodb = require('silence-js-db-mongo').LIB_MONGODB;
+const Long = mongodb.Long;
+const ObjectID = mongodb.ObjectID;
 const util = require('silence-js-util');
 const Base = require('silence-js-base-model');
 const { create, store } = require('./create');

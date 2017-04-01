@@ -1,4 +1,6 @@
-const Long = require('mongodb').Long;
+const mongodb = require('silence-js-db-mongo').LIB_MONGODB;
+const Long = mongodb.Long;
+const ObjectID = mongodb.ObjectID;
 
 const {
   ModelField,
@@ -16,7 +18,9 @@ const {
 const util = require('silence-js-util');
 const __store = {
   logger: null,
-  db: null
+  db: null,
+  Long,
+  ObjectID
 };
 
 function create(proto) {
@@ -116,6 +120,8 @@ ${_wc ? `let writeConcernOptions = {
 };` : ''}
 let db = STORE.db;
 let logger = STORE.logger;
+let Long = STORE.Long;
+let ObjectID = STORE.ObjectID;
 let collection = null;
 
 db._onInit(function(_db) {
@@ -155,6 +161,15 @@ class ${name} {
   }
   static get db() {
     return db;
+  }
+  static get ObjectID() {
+    return ObjectID;
+  }
+  static get ObjectId() {
+    return ObjectID;
+  }
+  static get Long() {
+    return Long;
   }
   static createTable(adminDB) {
     logger.debug('Create collection ${table}');
@@ -216,9 +231,19 @@ class ${name} {
       } else if (typeof fv === 'object') {
         for(let op in fv) {
           let opV = fv[op];
-          let opV2 = this._dealFieldV(opV, fieldName);
-          if (opV2 !== opV && opV2 !== undefined) {
-            fv[op] = opV2;
+          if (Array.isArray(opV)) { // op such as $in
+            for(let _vi = 0; _vi < opV.length; _vi++) {
+              let _opV = opV[_vi];
+              let _opV2 = this._dealFieldV(_opV, fieldName);
+              if (_opV2 !== _opV && _opV2 !== undefined) {
+                opV[_vi] = _opV2;
+              }
+            }
+          } else {
+            let opV2 = this._dealFieldV(opV, fieldName);
+            if (opV2 !== opV && opV2 !== undefined) {
+              fv[op] = opV2;
+            }
           }
         }
       } else {
