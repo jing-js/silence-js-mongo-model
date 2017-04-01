@@ -218,42 +218,6 @@ class ${name} {
       }
     }
   }
-  static _dealQuery(query) {
-    if (typeof query !== 'object' || query === null) return;
-    if (typeof query.id !== 'undefined') {
-      query._id = query.id;
-      delete query.id;
-    }
-    for(let fieldName in query) {
-      let fv = query[fieldName];
-      if (fv === undefined || fv === null) {
-        continue;
-      } else if (typeof fv === 'object') {
-        for(let op in fv) {
-          let opV = fv[op];
-          if (Array.isArray(opV)) { // op such as $in
-            for(let _vi = 0; _vi < opV.length; _vi++) {
-              let _opV = opV[_vi];
-              let _opV2 = this._dealFieldV(_opV, fieldName);
-              if (_opV2 !== _opV && _opV2 !== undefined) {
-                opV[_vi] = _opV2;
-              }
-            }
-          } else {
-            let opV2 = this._dealFieldV(opV, fieldName);
-            if (opV2 !== opV && opV2 !== undefined) {
-              fv[op] = opV2;
-            }
-          }
-        }
-      } else {
-        let v2 = this._dealFieldV(fv, fieldName);
-        if (v2 !== fv && v2 !== undefined) {
-          query[fieldName] = v2;
-        }
-      }
-    }
-  }
   static _dealInsertDoc(doc) {
     for(let fieldName in doc) {
       let v = doc[fieldName];
@@ -319,7 +283,6 @@ class ${name} {
     return $q;
   }
   static all(query, options) {
-    this._dealQuery(query);
     return this._find(query, options).toArray().then(docs => {
       for(let i = 0; i < docs.length; i++) {
         extract(docs[i]);
@@ -332,7 +295,6 @@ class ${name} {
     });
   }
   static exists(query) {
-    this._dealQuery(query);
     if (!query) {
       return Promise.reject('exists need query');
     }
@@ -343,7 +305,6 @@ class ${name} {
     });
   }
   static one(query, options) {
-    this._dealQuery(query);
     return this._find(query, options).next().then(doc => {
       if (!doc) return null;
       extract(doc);
@@ -352,7 +313,6 @@ class ${name} {
   }
   static oneUpdate(query, doc, options) {
     this._dealUpdateDoc(doc);
-    this._dealQuery(query);
     return collection.findOneAndUpdate(query, doc, ${_wc ? `options ? Object.assign(options, writeConcern) : writeConcern` : 'options'}).then(result => {
       if (!result || !result.value) return null;
       extract(result.value);
@@ -361,21 +321,18 @@ class ${name} {
   }
   static oneReplace(query, doc, options) {
     this._dealUpdateDoc(doc);
-    this._dealQuery(query);
     return collection.findOneAndReplace(query, doc, ${_wc ? `options ? Object.assign(options, writeConcern) : writeConcern` : 'options'}).then(result => {
       if (!result || !result.value) return null;
       extract(result.value);
       return options && options.__json ? result.value : new this(result.value, true);    });
   }
   static oneDelete(query, options) {
-    this._dealQuery(query);
     return collection.findOneAndDelete(query, ${_wc ? `options ? Object.assign(options, writeConcern) : writeConcern` : 'options'}).then(result => {
       if (!result || !result.value) return null;
       extract(result.value);
       return options && options.__json ? result.value : new this(result.value, true);    });
   }
   static touch(query, options) {
-    this._dealQuery(query);
     return collection.find(query).limit(1).project({
       _id: 1
     }).next().then(doc => {
@@ -389,7 +346,6 @@ class ${name} {
   }
   static updateOne(query, doc, options) {
     this._dealUpdateDoc(doc);
-    this._dealQuery(query);
     return collection.updateOne(query, doc, ${_wc ? `options ? Object.assign(options, writeConcern) : writeConcern` : 'options'}).then(result => {
       return result && result.modifiedCount === 1;
     });

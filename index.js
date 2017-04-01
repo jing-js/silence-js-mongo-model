@@ -16,7 +16,7 @@ function validateObjectId(val) {
   return (typeof val === 'string' && val.length === 24) || val instanceof ObjectID || (val instanceof Buffer && val.length === 12);
 }
 function convertObjectId(val) {
-  return validateObjectId(val) ? new ObjectID(val) : undefined;
+  return val instanceof ObjectID ? val : (validateObjectId(val) ? new ObjectID(val) : undefined);
 }
 function convertTimestamp(val) {
   return val instanceof Long ? val : (typeof val === 'number' ? Long.fromNumber(val) : undefined);
