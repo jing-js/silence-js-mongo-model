@@ -439,7 +439,7 @@ ${createFieldsPropertiesCode(fields)}
     return {
 ${fields.map((field, idx) => {
     let fn = field.name;
-    return `${fn === '_id' ? 'id' : fn}: this.${PREFIX}${fn}`;
+    return fn + ': ' + (field.dbType === 'TIMESTAMP' ? `this.${PREFIX}${fn}.toNumber()` : `this.${PREFIX}${fn}`);
 }).join(',\n')}
     };
   }
