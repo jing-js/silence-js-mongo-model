@@ -312,7 +312,7 @@ class ${name} {
     });
   }
   static oneUpdate(query, doc, options) {
-    this._dealUpdateDoc(doc);
+    if (!options || options.__deal !== false) this._dealUpdateDoc(doc);
     return collection.findOneAndUpdate(query, doc, ${_wc ? `options ? Object.assign(options, writeConcern) : writeConcern` : 'options'}).then(result => {
       if (!result || !result.value) return null;
       extract(result.value);
@@ -320,7 +320,7 @@ class ${name} {
     });
   }
   static oneReplace(query, doc, options) {
-    this._dealUpdateDoc(doc);
+    if (!options || options.__deal !== false) this._dealUpdateDoc(doc);
     return collection.findOneAndReplace(query, doc, ${_wc ? `options ? Object.assign(options, writeConcern) : writeConcern` : 'options'}).then(result => {
       if (!result || !result.value) return null;
       extract(result.value);
@@ -345,7 +345,7 @@ class ${name} {
     return Promise.reject('not implement as shard concern, see: https://docs.mongodb.com/v3.2/reference/method/db.collection.count/');
   }
   static updateOne(query, doc, options) {
-    this._dealUpdateDoc(doc);
+    if (!options || options.__deal !== false) this._dealUpdateDoc(doc);
     return collection.updateOne(query, doc, ${_wc ? `options ? Object.assign(options, writeConcern) : writeConcern` : 'options'}).then(result => {
       return result && result.modifiedCount === 1;
     });
